@@ -1,4 +1,6 @@
 def caesar_chiper(text, key, decrypt=False):
+    # Hilangkan spasi dari teks input
+    text = text.replace(" ", "")
     hasil = ""
     detailProses = []
     pergeseran = -key if decrypt else key
