@@ -1,148 +1,109 @@
-# RAIL FENCE CHIPER
 def enkripsi_rail_fence(text, key):
     if key < 2:
         raise ValueError("Jumlah rail minimal 2.")
     if text == "":
         raise ValueError("Teks tidak boleh kosong.")
 
-    # Menghapus spasi dari plaintext 
-    text = "".join(text.split())
+    text_bersih = "".join(text.split())
+    jumlah_karakter = len(text_bersih)
+    matriks = [["." for _ in range(jumlah_karakter)] for _ in range(key)]
 
-    jumlah_karakter = len(text)
-    matriks = []
-
-    for i in range(key): 
-        baris = [] 
-        for j in range(jumlah_karakter): 
-            baris.append(".") 
-        matriks.append(baris)
-
-    # Posisi awal berada di rail pertama 
-    nomor_rail = 0 
-    kolom = 0 
+    nomor_rail = 0
     arah_turun = True
 
-    # Menempatkan setiap karakter ke dalam pola zig-zag 
-    for i in range(jumlah_karakter): 
-        # Mengisi karakter ke matriks 
-        matriks[nomor_rail][kolom] = text[i] 
-        kolom += 1 
-        
-        # Jika berada di rail paling atas, arah harus turun 
-        if nomor_rail == 0: 
-            arah_turun = True 
-        
-        # Jika berada di rail paling bawah, arah harus naik 
-        elif nomor_rail == key - 1: 
-            arah_turun = False 
-            
-        # Mengatur perpindahan rail 
-        if arah_turun: 
-            nomor_rail += 1 
-        else: 
-            nomor_rail -= 1
+    for i in range(jumlah_karakter):
+        matriks[nomor_rail][i] = text_bersih[i]
 
-    # Menampilkan informasi teks 
-    print("=== INFORMASI TEKS ===") 
-    print(f"Jumlah karakter : {jumlah_karakter}") 
-    print(f"Kunci Rail Fence: {key}")
+        if nomor_rail == 0:
+            arah_turun = True
+        elif nomor_rail == key - 1:
+            arah_turun = False
 
-    # Menampilkan pola Rail Fence 
-    print("\n=== POLA SUSUNAN RAIL FENCE ===") 
-    
-    for nomor_baris in range(key): 
-        print(f"Rail {nomor_baris + 1}: ", end="") 
-        
-        for nomor_kolom in range(jumlah_karakter): 
-            print(matriks[nomor_baris][nomor_kolom], end=" ") 
-            print() 
-    
-    # Membaca karakter dari setiap rail 
-    print("\n=== CIPHERTEXT PER RAIL ===")
-    ciphertext = "" 
-    
-    for nomor_baris in range(key): 
-        rail_text = "" 
+        nomor_rail += 1 if arah_turun else -1
 
-        for nomor_kolom in range(jumlah_karakter): 
-            karakter = matriks[nomor_baris][nomor_kolom] 
-            if karakter != ".": 
-                rail_text += karakter  
-        print(f"Rail {nomor_baris + 1} = {rail_text}") 
-        ciphertext += rail_text 
-        
-    # Menampilkan ciphertext akhir 
-    print("\n=== TEKS HASIL ENKRIPSI RAIL FENCE ===") 
-    print(ciphertext) 
-    print(f"Jumlah karakter : {len(ciphertext)}") 
-    return ciphertext
+    visual_matriks = ""
+    for r in range(key):
+        visual_matriks += f"Rail {r + 1}: " + " ".join(matriks[r]) + "\n"
 
-def dekripsi_rail_fence(ciphertext, key): 
-    # Validasi jumlah rail 
-    if key < 2: 
-        raise ValueError("Jumlah rail minimal 2.") 
-    if ciphertext == "": 
-        raise ValueError("Ciphertext tidak boleh kosong.") 
-    
-    jumlah_karakter = len(ciphertext) 
-    matriks = [] 
-        
-    for i in range(key): 
-        baris = [] 
-        for j in range(jumlah_karakter): 
-            baris.append(".") 
-        matriks.append(baris) 
-                
-    # Membuat pola zig-zag 
-    nomor_rail = 0 
-    kolom = 0 
-    arah_turun = True 
-        
-    for i in range(jumlah_karakter): 
-        # Menandai posisi yang akan diisi 
-        matriks[nomor_rail][kolom] = "*" 
-        kolom += 1 
-        
-        if nomor_rail == 0: 
-            arah_turun = True 
-        elif nomor_rail == key - 1: 
-            arah_turun = False 
-            
-        if arah_turun: 
-            nomor_rail += 1 
-        else: nomor_rail -= 1 
-            
-    # Mengisi ciphertext ke posisi yang sudah ditandai 
-    posisi_ciphertext = 0 
-        
-    for nomor_baris in range(key): 
-        for nomor_kolom in range(jumlah_karakter): 
-            if matriks[nomor_baris][nomor_kolom] == "*": 
-                matriks[nomor_baris][nomor_kolom] = ciphertext[posisi_ciphertext]
-                posisi_ciphertext += 1 
-        
-    # Membaca kembali matriks secara zig-zag 
-    plaintext = "" 
-    nomor_rail = 0 
-    kolom = 0 
-    arah_turun = True 
-        
-    for i in range(jumlah_karakter): 
-        plaintext += matriks[nomor_rail][kolom] 
-        kolom += 1 
-        
-        if nomor_rail == 0: 
-            arah_turun = True 
-        elif nomor_rail == key - 1: 
-            arah_turun = False 
-            
-        if arah_turun: 
-            nomor_rail += 1 
-        else: nomor_rail -= 1 
-            
-    # Menampilkan hasil dekripsi 
-    print("\n=== HASIL DEKRIPSI RAIL FENCE ===") 
-    print(plaintext) 
-    print(f"Jumlah karakter : {len(plaintext)}") 
-    
-    return plaintext
+    ciphertext = ""
+    tabel_rail = []
+
+    for r in range(key):
+        rail_text = "".join([matriks[r][c] for c in range(jumlah_karakter) if matriks[r][c] != "."])
+        tabel_rail.append({"Rail": f"Rail {r+1}", "Teks Gabungan": rail_text})
+        ciphertext += rail_text
+
+    langkah = [
+        {
+            "title": "1. Visualisasi Pola Zig-Zag",
+            "code": visual_matriks
+        },
+        {
+            "title": "2. Pembacaan Karakter per Rail",
+            "table": tabel_rail
+        },
+        {
+            "title": "3. Ciphertext Akhir",
+            "code": ciphertext
+        }
+    ]
+    return ciphertext, langkah
+
+def dekripsi_rail_fence(ciphertext, key):
+    if key < 2:
+        raise ValueError("Jumlah rail minimal 2.")
+    if ciphertext == "":
+        raise ValueError("Ciphertext tidak boleh kosong.")
+
+    jumlah_karakter = len(ciphertext)
+    matriks = [["." for _ in range(jumlah_karakter)] for _ in range(key)]
+
+    nomor_rail = 0
+    arah_turun = True
+
+    for i in range(jumlah_karakter):
+        matriks[nomor_rail][i] = "*"
+
+        if nomor_rail == 0:
+            arah_turun = True
+        elif nomor_rail == key - 1:
+            arah_turun = False
+
+        nomor_rail += 1 if arah_turun else -1
+
+    posisi_ciphertext = 0
+    for r in range(key):
+        for c in range(jumlah_karakter):
+            if matriks[r][c] == "*":
+                matriks[r][c] = ciphertext[posisi_ciphertext]
+                posisi_ciphertext += 1
+
+    visual_matriks = ""
+    for r in range(key):
+        visual_matriks += f"Rail {r + 1}: " + " ".join(matriks[r]) + "\n"
+
+    plaintext = ""
+    nomor_rail = 0
+    arah_turun = True
+
+    for i in range(jumlah_karakter):
+        plaintext += matriks[nomor_rail][i]
+
+        if nomor_rail == 0:
+            arah_turun = True
+        elif nomor_rail == key - 1:
+            arah_turun = False
+
+        nomor_rail += 1 if arah_turun else -1
+
+    langkah = [
+        {
+            "title": "1. Rekonstruksi Matriks Berdasarkan Panjang Ciphertext",
+            "code": visual_matriks
+        },
+        {
+            "title": "2. Plaintext (Dibaca Zig-Zag)",
+            "code": plaintext
+        }
+    ]
+    return plaintext, langkah
