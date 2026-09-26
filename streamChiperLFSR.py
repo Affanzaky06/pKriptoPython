@@ -31,7 +31,7 @@ def periksa_seed(seed):
         raise ValueError( "Kunci LFSR tidak boleh semuanya 0." ) 
     return seed 
 
-# 2. MEMBUAT SATU LANGKAH LFSR # 
+# 2. MEMBUAT SATU LANGKAH LFSR 
 def langkah_lfsr(register, taps): 
     # Bit pertama menjadi bit yang keluar 
     bit_keluar = register[0] 

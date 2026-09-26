@@ -1,11 +1,19 @@
 # CAESAR CHIPER
 def caesar_chiper(text, key, decrypt=False):
+    # Menghapus semua spasi dari teks input
+    text = text.replace(" ", "")
     hasil = ""
     detailProses = []
+
+    # Menentukan arah pergeseran:
+    # decrypt=True, pergeseran negatif (mundur), karena proses dekripsi kebalikan dari enkripsi
+    # decrypt=False, pergeseran positif (maju), untuk enkripsi biasa
     if decrypt:
         pergeseran = -key
     else:
         pergeseran = key
+
+    # Membatasi nilai pergeseran ke rentang 0-25.
     pergeseran = pergeseran % 26
 
     for karakter in text:
@@ -15,6 +23,7 @@ def caesar_chiper(text, key, decrypt=False):
             else:
                 dasarHuruf = ord("a")
 
+            # Mengubah huruf jadi posisi angka 0-25 (A/a=0, B/b=1, ..., Z/z=25) dengan cara: kode huruf dikurangi kode huruf dasarnya
             posisiAwal = ord(karakter) - dasarHuruf
             posisiBaru = (posisiAwal + pergeseran) % 26
             hurufHasil = chr(dasarHuruf + posisiBaru)
@@ -43,6 +52,7 @@ def caesar_chiper(text, key, decrypt=False):
     return hasil, detailProses
 
 def enkripsi_caesar(text, key):
+    # Memanggil fungsi utama dengan decrypt=False -> berarti mode enkripsi (geser maju)
     hasil, detail_proses = caesar_chiper(text, key, False)
     langkah = [
         {
@@ -61,6 +71,7 @@ def enkripsi_caesar(text, key):
     return hasil, langkah
 
 def caesar_decrypt(text, key):
+    # Memanggil fungsi utama dengan decrypt=True -> berarti mode dekripsi (geser mundur)
     hasil, detail_proses = caesar_chiper(text, key, True)
     langkah = [
         {
