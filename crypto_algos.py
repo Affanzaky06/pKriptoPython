@@ -109,13 +109,11 @@ def railfence_decrypt(text, rails):
     n = len(text)
     eff = min(rails, n)
     pattern = _rail_pattern(n, eff) if eff >= 2 else [0] * n
-    # urutan posisi ketika dibaca per rail
     order = sorted(range(n), key=lambda i: (pattern[i], i))
     plain = [""] * n
     for ch, pos in zip(text, order):
         plain[pos] = ch
     result = "".join(plain)
-    # panjang tiap rail
     lens = [pattern.count(r) for r in range(eff)]
     idx, rows = 0, []
     for r in range(eff):
@@ -135,13 +133,21 @@ def railfence_decrypt(text, rails):
     return result, steps
 
 
+def _parse_hex(hex_text):
+    h = "".join(hex_text.split())
+    try:
+        return bytes.fromhex(h)
+    except ValueError:
+        raise ValueError("Ciphertext harus berupa string heksadesimal (0-9, A-F) dengan panjang genap.")
+
+
 # ======================================================================
-# 3. STREAM CIPHER dengan LFSR (modern, dari Materi 5)
-#    ci = pi XOR ki ; keystream dibangkitkan oleh LFSR
+# 3. STREAM CIPHER dengan LFSR (modern, dari Materi 5 slide 14-32)
+#    ci = pi XOR ki ; keystream dibangkitkan oleh LFSR (keystream generator)
 # ======================================================================
 
 # tap (nomor bit, 1 = b1) untuk fungsi umpan balik; semuanya periode maksimal 2^n - 1
-# n=4 memakai b4 = b1 XOR b4 seperti contoh di slide
+# n=4 memakai b4 = b1 XOR b4 seperti contoh di slide (U = 1111)
 LFSR_TAPS = {
     4: (1, 4), 5: (1, 3), 6: (1, 2), 7: (1, 2), 8: (1, 2, 3, 8), 9: (1, 5),
     10: (1, 4), 11: (1, 3), 12: (1, 2, 3, 9), 13: (1, 2, 3, 6), 14: (1, 2, 3, 13),
@@ -208,8 +214,8 @@ def _lfsr_info_step(seed_bits):
     n = len(seed_bits)
     taps = LFSR_TAPS[n]
     rumus = " ⊕ ".join(f"b{t}" for t in taps)
-    return {"title": "1. Konfigurasi LFSR",
-            "desc": f"Register **{n} bit**, seed (kunci) = `{''.join(map(str, seed_bits))}`. "
+    return {"title": "1. Konfigurasi LFSR (keystream generator)",
+            "desc": f"Register **{n} bit**, seed (kunci U) = `{''.join(map(str, seed_bits))}`. "
                     f"Fungsi umpan balik: `b{n} = {rumus}`. Periode maksimum = 2^{n} − 1 = **{2 ** n - 1} bit**."
                     + (" ⚠️ Periode pendek: keystream cepat berulang (mirip XOR sederhana, kurang aman)."
                        if n < 12 else "")}
@@ -232,14 +238,6 @@ def stream_encrypt(text, seed):
         {"title": "4. Ciphertext (hex)", "code": out.hex().upper()},
     ]
     return out.hex().upper(), steps
-
-
-def _parse_hex(hex_text):
-    h = "".join(hex_text.split())
-    try:
-        return bytes.fromhex(h)
-    except ValueError:
-        raise ValueError("Ciphertext harus berupa string heksadesimal (0-9, A-F) dengan panjang genap.")
 
 
 def stream_decrypt(hex_text, seed):
@@ -265,138 +263,97 @@ def stream_decrypt(hex_text, seed):
 
 
 # ======================================================================
-# 4. BLOCK CIPHER - Jaringan Feistel 64-bit (modern, dari Materi 5)
-#    Blok 64 bit = 8 karakter, kunci 64 bit, 8 putaran, padding PKCS#7
+# 4. XOR SEDERHANA (modern, dari Materi 5 slide 12-13)
+#    C = P XOR K, kunci diulang secara periodik (prinsip sama seperti Vigenere,
+#    tapi dalam mode bit). PPT juga menyebut algoritma ini kurang aman karena
+#    cipherteksnya mudah dipecahkan bila kunci dipakai berulang.
 # ======================================================================
 
-BLOCK_SIZE = 8
-ROUNDS = 8
-M32 = 0xFFFFFFFF
-
-
-def _rotl32(x, r):
-    return ((x << r) | (x >> (32 - r))) & M32
-
-
-def _rotl64(x, r):
-    return ((x << r) | (x >> (64 - r))) & 0xFFFFFFFFFFFFFFFF
-
-
-def _key64(key):
+def _xor_bytes(data, key):
     if not key:
-        raise ValueError("Kunci block cipher tidak boleh kosong.")
+        raise ValueError("Kunci tidak boleh kosong.")
     kb = key.encode("utf-8")
-    kb = (kb * (BLOCK_SIZE // len(kb) + 1))[:BLOCK_SIZE]   # ulang/potong jadi 8 byte (64 bit)
-    return int.from_bytes(kb, "big"), kb
+    key_full = bytes(kb[i % len(kb)] for i in range(len(data)))
+    out = bytes(d ^ k for d, k in zip(data, key_full))
+    rows = []
+    for i, (d, k, c) in enumerate(zip(data, key_full, out), start=1):
+        rows.append({
+            "Ke-": i,
+            "Plaintext": chr(d) if 32 <= d < 127 else f"0x{d:02X}",
+            "Kunci (diulang)": chr(k) if 32 <= k < 127 else f"0x{k:02X}",
+            "P (bin)": _bits(d), "K (bin)": _bits(k), "C (bin)": _bits(c), "C (hex)": f"{c:02X}",
+        })
+    return out, key_full, rows
 
 
-def _round_keys(key):
-    k64, kb = _key64(key)
-    rks = []
-    for i in range(ROUNDS):
-        rk = (_rotl64(k64, 7 * (i + 1)) >> 32) ^ (((i + 1) * 0x9E3779B9) & M32)
-        rks.append(rk)
-    return rks, kb
+def _xor_key_step(key, key_full):
+    return {"title": "1. Ulangi kunci secara periodik",
+            "desc": f"Kunci `{key}` ({len(key.encode('utf-8'))} byte) diulang terus sampai sepanjang data "
+                    f"({len(key_full)} byte), mirip Vigenère cipher tapi dalam mode bit.",
+            "code": key_full.decode("latin1")}
 
 
-def _F(r, k):
-    return _rotl32(((r ^ k) * 0x045D9F3B) & M32, 13)
-
-
-def _feistel(block, rks, trace=None):
-    L, R = (block >> 32) & M32, block & M32
-    for i, k in enumerate(rks):
-        f = _F(R, k)
-        newR = L ^ f
-        if trace is not None:
-            trace.append({"Putaran": i + 1, "L": f"{L:08X}", "R": f"{R:08X}", "Kunci putaran": f"{k:08X}",
-                          "F(R,K)": f"{f:08X}", "L baru (=R)": f"{R:08X}", "R baru (=L ⊕ F)": f"{newR:08X}"})
-        L, R = R, newR
-    return (R << 32) | L        # tukar L dan R di akhir
-
-
-def _pad(data):
-    n = BLOCK_SIZE - len(data) % BLOCK_SIZE
-    return data + bytes([n]) * n, n
-
-
-def _blocks(data):
-    return [data[i:i + BLOCK_SIZE] for i in range(0, len(data), BLOCK_SIZE)]
-
-
-def _key_steps(key, rks, kb):
-    return {"title": "1. Kunci & round key",
-            "desc": f"Kunci `{key}` diubah menjadi 64 bit (diulang/dipotong menjadi 8 byte): `{kb.hex().upper()}`. "
-                    f"Dari kunci ini dibangkitkan {ROUNDS} round key 32-bit.",
-            "table": [{"Putaran": i + 1, "Round key": f"{k:08X}"} for i, k in enumerate(rks)]}
-
-
-def block_encrypt(text, key):
+def xor_encrypt(text, key):
     data = text.encode("utf-8")
     if not data:
         raise ValueError("Plaintext tidak boleh kosong.")
-    rks, kb = _round_keys(key)
-    padded, n = _pad(data)
-    blocks = _blocks(padded)
-    out, summary, first_trace = b"", [], []
-    for bi, b in enumerate(blocks):
-        v = int.from_bytes(b, "big")
-        c = _feistel(v, rks, first_trace if bi == 0 else None)
-        cb = c.to_bytes(BLOCK_SIZE, "big")
-        out += cb
-        summary.append({"Blok": bi + 1, "Plaintext (hex)": b.hex().upper(), "Ciphertext (hex)": cb.hex().upper()})
+    out, key_full, rows = _xor_bytes(data, key)
     steps = [
-        _key_steps(key, rks, kb),
-        {"title": "2. Padding & pembagian blok",
-         "desc": f"Plaintext = {len(data)} byte. Blok = 64 bit (8 byte), ditambah **{n} byte padding** "
-                 f"(nilai `{n:02X}`) sehingga menjadi {len(blocks)} blok.",
-         "table": [{"Blok": i + 1, "Isi (hex)": b.hex().upper()} for i, b in enumerate(blocks)]},
-        {"title": "3. Jaringan Feistel pada blok 1",
-         "desc": "Tiap putaran: `L' = R`, `R' = L ⊕ F(R, K)`. Setelah 8 putaran, L dan R ditukar.",
-         "table": first_trace},
-        {"title": "4. Hasil semua blok (mode ECB)", "table": summary},
-        {"title": "5. Ciphertext (hex)", "code": out.hex().upper()},
+        _xor_key_step(key, key_full),
+        {"title": "2. XOR tiap byte: `C = P ⊕ K`", "table": rows},
+        {"title": "3. Ciphertext (hex)", "code": out.hex().upper()},
     ]
     return out.hex().upper(), steps
 
 
-def block_decrypt(hex_text, key):
+def xor_decrypt(hex_text, key):
     data = _parse_hex(hex_text)
-    if not data or len(data) % BLOCK_SIZE != 0:
-        raise ValueError("Panjang ciphertext harus kelipatan 8 byte (16 karakter hex).")
-    rks, kb = _round_keys(key)
-    rev = rks[::-1]
-    out, summary, first_trace = b"", [], []
-    for bi, b in enumerate(_blocks(data)):
-        v = int.from_bytes(b, "big")
-        p = _feistel(v, rev, first_trace if bi == 0 else None)
-        pb = p.to_bytes(BLOCK_SIZE, "big")
-        out += pb
-        summary.append({"Blok": bi + 1, "Ciphertext (hex)": b.hex().upper(), "Hasil (hex)": pb.hex().upper()})
-    n = out[-1]
-    if not 1 <= n <= BLOCK_SIZE or out[-n:] != bytes([n]) * n:
-        raise ValueError("Padding tidak valid. Kunci kemungkinan salah atau ciphertext rusak.")
-    plain_bytes = out[:-n]
+    if not data:
+        raise ValueError("Ciphertext tidak boleh kosong.")
+    out, key_full, rows = _xor_bytes(data, key)
     try:
-        plain = plain_bytes.decode("utf-8")
+        plain = out.decode("utf-8")
     except UnicodeDecodeError:
         raise ValueError("Hasil dekripsi bukan teks UTF-8 yang valid. Kunci kemungkinan salah.")
     steps = [
-        _key_steps(key, rks, kb),
-        {"title": "2. Pembagian blok ciphertext",
-         "table": [{"Blok": i + 1, "Isi (hex)": b.hex().upper()} for i, b in enumerate(_blocks(data))]},
-        {"title": "3. Jaringan Feistel pada blok 1 (round key dipakai terbalik)",
-         "desc": "Dekripsi memakai struktur yang sama, hanya urutan round key dibalik.", "table": first_trace},
-        {"title": "4. Hasil semua blok", "table": summary},
-        {"title": "5. Hapus padding",
-         "desc": f"Byte terakhir bernilai `{n:02X}` → buang {n} byte padding."},
-        {"title": "6. Plaintext", "code": plain},
+        _xor_key_step(key, key_full),
+        {"title": "2. XOR tiap byte: `P = C ⊕ K`",
+         "desc": "Operasi sama seperti enkripsi karena `(P ⊕ K) ⊕ K = P`.", "table": rows},
+        {"title": "3. Plaintext", "code": plain},
     ]
     return plain, steps
 
 
+def xor_encrypt_hex(hex_text, key):
+    """Versi XOR sederhana untuk input berupa hex byte (dipakai di rantai super enkripsi)."""
+    data = _parse_hex(hex_text)
+    if not data:
+        raise ValueError("Data tidak boleh kosong.")
+    out, key_full, rows = _xor_bytes(data, key)
+    steps = [
+        _xor_key_step(key, key_full),
+        {"title": "2. XOR tiap byte: `C = P ⊕ K`", "table": rows},
+        {"title": "3. Hasil (hex)", "code": out.hex().upper()},
+    ]
+    return out.hex().upper(), steps
+
+
+def xor_decrypt_hex(hex_text, key):
+    """Kebalikan xor_encrypt_hex; hasilnya tetap hex (belum diterjemahkan ke teks)."""
+    data = _parse_hex(hex_text)
+    if not data:
+        raise ValueError("Data tidak boleh kosong.")
+    out, key_full, rows = _xor_bytes(data, key)
+    steps = [
+        _xor_key_step(key, key_full),
+        {"title": "2. XOR tiap byte: `P = C ⊕ K`", "table": rows},
+        {"title": "3. Hasil (hex)", "code": out.hex().upper()},
+    ]
+    return out.hex().upper(), steps
+
+
 # ======================================================================
-# 5. SUPER ENKRIPSI = Caesar -> Rail Fence -> Stream (LFSR) -> Block (Feistel)
+# 5. SUPER ENKRIPSI = Caesar -> Rail Fence -> Stream (LFSR) -> XOR Sederhana
 # ======================================================================
 
 def super_encrypt(text, shift, rails, seed, key):
@@ -409,66 +366,15 @@ def super_encrypt(text, shift, rails, seed, key):
     stages.append(("Tahap 2 - Rail Fence Cipher", s1, s2, st2))
     s3, st3 = stream_encrypt(s2, seed)
     stages.append(("Tahap 3 - Stream Cipher (LFSR)", s2, s3, st3))
-    s4, st4 = block_encrypt_hex(s3, key)
-    stages.append(("Tahap 4 - Block Cipher (Feistel)", s3, s4, st4))
+    s4, st4 = xor_encrypt_hex(s3, key)
+    stages.append(("Tahap 4 - XOR Sederhana", s3, s4, st4))
     return s4, stages
-
-
-def block_encrypt_hex(hex_text, key):
-    """Block cipher yang inputnya hex hasil tahap sebelumnya (byte, bukan teks)."""
-    data = _parse_hex(hex_text)
-    rks, kb = _round_keys(key)
-    padded, n = _pad(data)
-    blocks = _blocks(padded)
-    out, summary, first_trace = b"", [], []
-    for bi, b in enumerate(blocks):
-        c = _feistel(int.from_bytes(b, "big"), rks, first_trace if bi == 0 else None)
-        cb = c.to_bytes(BLOCK_SIZE, "big")
-        out += cb
-        summary.append({"Blok": bi + 1, "Input (hex)": b.hex().upper(), "Ciphertext (hex)": cb.hex().upper()})
-    steps = [
-        _key_steps(key, rks, kb),
-        {"title": "2. Padding & pembagian blok",
-         "desc": f"Input = {len(data)} byte, ditambah **{n} byte padding** → {len(blocks)} blok 64-bit.",
-         "table": [{"Blok": i + 1, "Isi (hex)": b.hex().upper()} for i, b in enumerate(blocks)]},
-        {"title": "3. Jaringan Feistel pada blok 1", "table": first_trace},
-        {"title": "4. Hasil semua blok (mode ECB)", "table": summary},
-        {"title": "5. Ciphertext (hex)", "code": out.hex().upper()},
-    ]
-    return out.hex().upper(), steps
-
-
-def block_decrypt_hex(hex_text, key):
-    """Kebalikan block_encrypt_hex: hasilnya hex byte (belum diterjemahkan ke teks)."""
-    data = _parse_hex(hex_text)
-    if not data or len(data) % BLOCK_SIZE != 0:
-        raise ValueError("Panjang ciphertext harus kelipatan 8 byte (16 karakter hex).")
-    rks, kb = _round_keys(key)
-    rev = rks[::-1]
-    out, summary, first_trace = b"", [], []
-    for bi, b in enumerate(_blocks(data)):
-        p = _feistel(int.from_bytes(b, "big"), rev, first_trace if bi == 0 else None)
-        pb = p.to_bytes(BLOCK_SIZE, "big")
-        out += pb
-        summary.append({"Blok": bi + 1, "Ciphertext (hex)": b.hex().upper(), "Hasil (hex)": pb.hex().upper()})
-    n = out[-1]
-    if not 1 <= n <= BLOCK_SIZE or out[-n:] != bytes([n]) * n:
-        raise ValueError("Padding tidak valid. Kunci block cipher kemungkinan salah atau ciphertext rusak.")
-    res = out[:-n].hex().upper()
-    steps = [
-        _key_steps(key, rks, kb),
-        {"title": "2. Jaringan Feistel pada blok 1 (round key terbalik)", "table": first_trace},
-        {"title": "3. Hasil semua blok", "table": summary},
-        {"title": "4. Hapus padding", "desc": f"Buang {n} byte padding (`{n:02X}`)."},
-        {"title": "5. Hasil (hex)", "code": res},
-    ]
-    return res, steps
 
 
 def super_decrypt(hex_text, shift, rails, seed, key):
     stages = []
-    s1, st1 = block_decrypt_hex(hex_text, key)
-    stages.append(("Tahap 1 - Dekripsi Block Cipher (Feistel)", hex_text, s1, st1))
+    s1, st1 = xor_decrypt_hex(hex_text, key)
+    stages.append(("Tahap 1 - Dekripsi XOR Sederhana", hex_text, s1, st1))
     s2, st2 = stream_decrypt(s1, seed)
     stages.append(("Tahap 2 - Dekripsi Stream Cipher (LFSR)", s1, s2, st2))
     s3, st3 = railfence_decrypt(s2, rails)

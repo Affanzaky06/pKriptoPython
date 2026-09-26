@@ -9,7 +9,7 @@ MENUS = [
     "1. Caesar Cipher",
     "2. Rail Fence Cipher",
     "3. Stream Cipher (LFSR)",
-    "4. Block Cipher (Feistel)",
+    "4. XOR Sederhana",
     "5. Super Enkripsi",
 ]
 
@@ -20,11 +20,11 @@ INFO = {
                "Plaintext ditulis zig-zag pada beberapa *rail* lalu dibaca per baris rail."),
     MENUS[2]: ("Modern · Cipher aliran (Materi 5)",
                "Keystream dibangkitkan oleh LFSR dari kunci bit, lalu di-XOR bit per bit: `Ci = Pi ⊕ Ki`."),
-    MENUS[3]: ("Modern · Cipher blok (Materi 5)",
-               "Plaintext dibagi blok 64 bit dan diproses jaringan Feistel 8 putaran dengan kunci 64 bit. "
-               "Blok terakhir diberi padding."),
+    MENUS[3]: ("Modern · XOR Sederhana (Materi 5)",
+               "Plaintext di-XOR dengan kunci yang diulang secara periodik: `C = P ⊕ K`. "
+               "Prinsipnya sama seperti Vigenère cipher, hanya dalam mode bit."),
     MENUS[4]: ("Super enkripsi",
-               "Gabungan 4 algoritma: **Caesar → Rail Fence → Stream (LFSR) → Block (Feistel)**. "
+               "Gabungan 4 algoritma: **Caesar → Rail Fence → Stream (LFSR) → XOR Sederhana**. "
                "Dekripsi dilakukan dengan urutan terbalik."),
 }
 
@@ -102,8 +102,8 @@ def seed_key(k):
     return st.text_input("Kunci LFSR (4–16 bit, bukan semua 0)", "1111", key=k)
 
 
-def block_key(k):
-    return st.text_input("Kunci (teks; dipakai sebagai 64 bit)", "rahasia", key=k)
+def xor_key(k):
+    return st.text_input("Kunci (teks, akan diulang periodik)", "kunci", key=k)
 
 
 def page_super():
@@ -112,7 +112,7 @@ def page_super():
         shift = c1.number_input("Caesar: geseran", 0, 1000, 3, key=f"{p}_s")
         rails = c2.number_input("Rail Fence: jumlah rail", 2, 50, 3, key=f"{p}_r")
         seed = c1.text_input("LFSR: kunci bit", "1011", key=f"{p}_l")
-        key = c2.text_input("Block cipher: kunci teks", "rahasia", key=f"{p}_b")
+        key = c2.text_input("XOR Sederhana: kunci teks", "kunci", key=f"{p}_b")
         return shift, rails, seed, key
 
     tab_e, tab_d = st.tabs(["🔒 Enkripsi", "🔓 Dekripsi"])
@@ -151,6 +151,6 @@ elif menu == MENUS[1]:
 elif menu == MENUS[2]:
     page_simple(menu, ca.stream_encrypt, ca.stream_decrypt, seed_key, dec_input_label="Ciphertext (hex)")
 elif menu == MENUS[3]:
-    page_simple(menu, ca.block_encrypt, ca.block_decrypt, block_key, dec_input_label="Ciphertext (hex)")
+    page_simple(menu, ca.xor_encrypt, ca.xor_decrypt, xor_key, dec_input_label="Ciphertext (hex)")
 else:
     page_super()
