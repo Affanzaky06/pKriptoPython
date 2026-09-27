@@ -69,7 +69,7 @@ def enkripsi_caesar(text, key):
     ]
     return hasil, langkah
 
-def caesar_decrypt(text, key):
+def dekripsi_caesar(text, key):
     # Memanggil fungsi utama dengan decrypt=True -> berarti mode dekripsi (geser mundur)
     hasil, detail_proses = caesar_chiper(text, key, True)
     langkah = [

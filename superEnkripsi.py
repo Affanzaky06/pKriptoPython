@@ -1,7 +1,7 @@
 # SUPER ENKRIPSI 
 # Caesar -> Rail Fence -> Stream Cipher (LFSR) -> Block Cipher Sederhana
 
-from caesarChiper import enkripsi_caesar, caesar_decrypt
+from caesarChiper import enkripsi_caesar, dekripsi_caesar
 from railfenceChiper import enkripsi_rail_fence, dekripsi_rail_fence
 from streamChiperLFSR import stream_encrypt, stream_decrypt
 from blockChiper import enkripsi_block, dekripsi_block
@@ -84,7 +84,7 @@ def super_decrypt(hex_text, shift, rails, seed, key):
     # Tahap 4: Dekripsi Caesar Cipher
     # Input : teks huruf hasil tahap 3
     # Output: TEKS ASLI (plaintext) sebelum dienkripsi sama sekali
-    hasil_caesar, langkah_caesar = caesar_decrypt(hasil_railfence, shift)
+    hasil_caesar, langkah_caesar = dekripsi_caesar(hasil_railfence, shift)
     stages.append(("Tahap 4 - Dekripsi Caesar Cipher", hasil_railfence, hasil_caesar, langkah_caesar))
 
     # s4 adalah plaintext akhir hasil super dekripsi

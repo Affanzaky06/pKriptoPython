@@ -93,6 +93,20 @@ def proses_per_blok(data, key):
         })
     return bytes(hasil_total), rincian_blok, kunci_blok
 
+# Fungsi Tambahan untuk tampilan Streamlit
+def ratakan_rincian_blok(rincian_blok):
+    # Menggabungkan info blok + info tiap byte jadi SATU baris per byte, supaya bisa ditampilkan sebagai tabel datar
+    baris_rata = []
+    for blok in rincian_blok:
+        for baris_byte in blok["detail"]:
+            baris_rata.append({
+                "Blok ke-": blok["Blok ke-"],
+                "Kunci Blok": blok["Kunci blok yang dipakai"],
+                **baris_byte   
+                # membongkar isi baris_byte jadi kolom-kolom baru
+            })
+    return baris_rata
+
 # 6. ENKRIPSI
 def enkripsi_block(text, key):
     # Validasi input
@@ -124,7 +138,7 @@ def enkripsi_block(text, key):
         },
         {
             "title": "3. XOR per Blok (C = P XOR K)",
-            "table": rincian_blok
+            "table": ratakan_rincian_blok(rincian_blok)
         },
         {
             "title": "4. Ciphertext (Hex)",
@@ -182,7 +196,7 @@ def dekripsi_block(ciphertext_hex, key):
         {
             "title": "2. XOR per Blok (P = C XOR K)",
             "desc": "Operasi sama persis seperti enkripsi, karena (P XOR K) XOR K = P.",
-            "table": rincian_blok
+            "table": ratakan_rincian_blok(rincian_blok)
         },
         {
             "title": "3. Buang Padding & Plaintext Asli",
