@@ -1,93 +1,192 @@
-import hashlib
+# BLOCK CIPHER (XOR per blok)
+# Rumus enkripsi : C = P XOR K
+# Rumus dekripsi : P = C XOR K
 
-BLOCK_SIZE = 8      # 8 byte = 64 bit
-NUM_ROUNDS = 8      # jumlah ronde Feistel
+# ukuran satu blok dalam byte (8 byte = 64 bit)
+BLOCK_SIZE = 8   
 
-def _derive_subkeys(key: str, rounds: int = NUM_ROUNDS):
-    subkeys = []
-    material = key.encode("utf-8")
-    for i in range(rounds):
-        h = hashlib.sha256(material + bytes([i])).digest()
-        subkeys.append(h[0])
-    return subkeys
+# 1. MENYIAPKAN KUNCI SEPANJANG SATU BLOK
+def perpanjang_kunci(key, panjang_blok=BLOCK_SIZE):
+    # Validasi kunci tidak boleh kosong
+    if not key:
+        raise ValueError("Kunci tidak boleh kosong.")
 
-def _F(half_block: bytes, subkey: int) -> bytes:
-    result = bytearray()
-    for i, b in enumerate(half_block):
-        val = (b ^ subkey ^ (i * 7 + 1)) & 0xFF
-        val = ((val << 3) | (val >> 5)) & 0xFF
-        result.append(val)
-    return bytes(result)
+    # Mengubah kunci (teks) jadi bytes, karena XOR cuma bisa dilakukan ke angka/bytes
+    kunci_bytes = key.encode("utf-8")
 
-def _xor_bytes(a: bytes, b: bytes) -> bytes:
-    return bytes(x ^ y for x, y in zip(a, b))
+    # Mengulang kunci karakter demi karakter sampai panjangnya PAS SEPANJANG SATU BLOK
+    kunci_blok = bytes(kunci_bytes[i % len(kunci_bytes)] for i in range(panjang_blok))
+    return kunci_blok
 
-def _pad(data: bytes, block_size: int = BLOCK_SIZE) -> bytes:
-    pad_len = block_size - (len(data) % block_size)
-    if pad_len == 0: pad_len = block_size
-    return data + bytes([pad_len] * pad_len)
+# 2. MENAMBAHKAN PADDING (supaya panjang data pas kelipatan BLOCK_SIZE)
+def tambah_padding(data, panjang_blok=BLOCK_SIZE):
+    # Block cipher memproses blok yang penuh (utuh sepanjang BLOCK_SIZE).
+    # Kalau panjang data tidak pas kelipatan BLOCK_SIZE, tambahkan byte tambahan (padding) di akhir supaya pas.
 
-def _unpad(data: bytes) -> bytes:
-    if not data: return data
-    pad_len = data[-1]
-    if pad_len < 1 or pad_len > BLOCK_SIZE:
+    # Menghitung berapa byte kurangnya supaya jadi kelipatan panjang_blok
+    jumlah_kurang = panjang_blok - (len(data) % panjang_blok)
+
+    # Kalau pas sudah kelipatan, tetap tambahkan satu blok padding penuh agar selalu tahu ada padding yang perlu dibuang (lihat fungsi buang_padding)
+    if jumlah_kurang == 0:
+        jumlah_kurang = panjang_blok
+
+    # Isi padding: setiap byte tambahan diisi ANGKA jumlah_kurang 
+    # proses buang_padding: tinggal baca byte terakhir, itulah jumlah byte padding yang harus dibuang.
+    return data + bytes([jumlah_kurang] * jumlah_kurang)
+
+
+# 3. MEMBUANG PADDING
+def buang_padding(data, panjang_blok=BLOCK_SIZE):
+    if not data:
         return data
-    return data[:-pad_len]
 
-def _encrypt_block(block: bytes, subkeys) -> bytes:
-    half = len(block) // 2
-    L, R = block[:half], block[half:]
-    for sk in subkeys:
-        f_out = _F(R, sk)
-        new_R = _xor_bytes(L, f_out[:len(L)])
-        L, R = R, new_R
-    return L + R
+    # Byte terakhir menyimpan informasi "berapa banyak padding yang ditambahkan"
+    jumlah_padding = data[-1]
 
-def _decrypt_block(block: bytes, subkeys) -> bytes:
-    half = len(block) // 2
-    L, R = block[:half], block[half:]
-    for sk in reversed(subkeys):
-        f_out = _F(L, sk)
-        new_L = _xor_bytes(R, f_out[:len(R)])
-        R, L = L, new_L
-    return L + R
+    # Validasi: kalau nilainya aneh anggap saja tidak ada padding yang perlu dibuang
+    if jumlah_padding < 1 or jumlah_padding > panjang_blok:
+        return data
 
-def block_cipher_encrypt(plaintext: str, key: str) -> bytes:
-    subkeys = _derive_subkeys(key)
-    data = _pad(plaintext.encode("utf-8"))
-    out = bytearray()
-    for i in range(0, len(data), BLOCK_SIZE):
-        block = data[i:i + BLOCK_SIZE]
-        out.extend(_encrypt_block(block, subkeys))
-    return bytes(out)
+    # Membuang byte padding dari akhir data
+    return data[:-jumlah_padding]
 
-def block_cipher_decrypt(ciphertext: bytes, key: str) -> str:
-    subkeys = _derive_subkeys(key)
-    out = bytearray()
-    for i in range(0, len(ciphertext), BLOCK_SIZE):
-        block = ciphertext[i:i + BLOCK_SIZE]
-        out.extend(_decrypt_block(block, subkeys))
-    data = _unpad(bytes(out))
-    return data.decode("utf-8", errors="ignore")
 
-# --- WRAPPER UNTUK STREAMLIT ---
+# 4. MENG-XOR SATU BLOK DENGAN KUNC
+def xor_satu_blok(blok, kunci_blok):
+    # zip(blok, kunci_blok) memasangkan byte-byte dari plaintexT dengan bytes kunci.
+    hasil = bytes(b_data ^ b_key for b_data, b_key in zip(blok, kunci_blok))
+
+    # Menyimpan rincian tiap byte dalam blok ini
+    detail = []
+    for i, (b_data, b_key, b_hasil) in enumerate(zip(blok, kunci_blok, hasil), start=1):
+        detail.append({
+            "Byte ke-": i,
+            "Plaintext/Cipher (masuk)": chr(b_data) if 32 <= b_data <= 126 else f"0x{b_data:02X}",
+            "Kunci": chr(b_key) if 32 <= b_key <= 126 else f"0x{b_key:02X}",
+            "Hasil (hex)": f"{b_hasil:02X}",
+        })
+    return hasil, detail
+
+
+# 5. MEMPROSES SELURUH DATA
+def proses_per_blok(data, key):
+    # Menyiapkan kunci SEKALI SAJA, sepanjang satu blok
+    kunci_blok = perpanjang_kunci(key, BLOCK_SIZE)
+
+    hasil_total = bytearray()
+    rincian_blok = []   
+
+    # Menyusuri data per BLOCK_SIZE byte sekaligus (blok demi blok)
+    # range(0, len(data), BLOCK_SIZE) menghasilkan: 0, 8, 16, 24, ... 
+    # artinya "melompat" sejauh satu blok di setiap perulangan
+    for nomor_blok, awal in enumerate(range(0, len(data), BLOCK_SIZE), start=1):
+        blok = data[awal:awal + BLOCK_SIZE]
+
+        # kunci_blok yang dipakai di sini SAMA PERSIS untuk setiap blok
+        hasil_blok, detail_byte = xor_satu_blok(blok, kunci_blok)
+
+        hasil_total.extend(hasil_blok)
+        rincian_blok.append({
+            "Blok ke-": nomor_blok,
+            "Kunci blok yang dipakai": kunci_blok.hex().upper(),
+            "detail": detail_byte,
+        })
+    return bytes(hasil_total), rincian_blok, kunci_blok
+
+# 6. ENKRIPSI
 def enkripsi_block(text, key):
-    ct_bytes = block_cipher_encrypt(text, key)
-    ct_hex = ct_bytes.hex().upper()
-    langkah = [
-        {"title": "1. Derivasi Kunci", "desc": f"Membuat {NUM_ROUNDS} subkeys dari kunci '{key}'."},
-        {"title": "2. Padding & Feistel Network", "desc": "Teks dibagi per 8 byte, diproses 8 ronde L dan R."},
-        {"title": "3. Ciphertext (Hex)", "code": ct_hex}
-    ]
-    return ct_hex, langkah
+    # Validasi input
+    if text == "":
+        raise ValueError("Plaintext tidak boleh kosong.")
 
-def dekripsi_block(ct_hex, key):
-    # Bersihkan spasi jika ada
-    ct_hex = "".join(ct_hex.split())
-    ct_bytes = bytes.fromhex(ct_hex)
-    pt = block_cipher_decrypt(ct_bytes, key)
+    # Mengubah teks jadi bytes (format UTF-8)
+    data = text.encode("utf-8")
+
+    # Menambahkan padding supaya panjangnya pas kelipatan BLOCK_SIZE
+    data_padded = tambah_padding(data, BLOCK_SIZE)
+
+    # Memproses seluruh data, blok demi blok, XOR dengan kunci yang sama tiap blok
+    hasil_bytes, rincian_blok, kunci_blok = proses_per_blok(data_padded, key)
+
+    # Mengubah hasil (bytes) jadi teks hexadecimal biar gampang ditampilkan/disimpan
+    ciphertext = hasil_bytes.hex().upper()
+
     langkah = [
-        {"title": "1. Dekripsi Feistel Network", "desc": "Merapikan blok dengan subkeys urutan terbalik."},
-        {"title": "2. Unpad & Teks Asli", "code": pt}
+        {
+            "title": "1. Padding & Pembagian Blok",
+            "desc": (f"Plaintext ({len(data)} byte) di-padding jadi {len(data_padded)} byte, "
+                     f"lalu dibagi menjadi {len(rincian_blok)} blok berukuran {BLOCK_SIZE} byte.")
+        },
+        {
+            "title": "2. Kunci per Blok",
+            "desc": (f"Kunci '{key}' diperpanjang jadi {BLOCK_SIZE} byte: {kunci_blok.hex().upper()}. "
+                     f"Kunci ini dipakai SAMA PERSIS untuk semua blok (tidak berubah antar blok).")
+        },
+        {
+            "title": "3. XOR per Blok (C = P XOR K)",
+            "table": rincian_blok
+        },
+        {
+            "title": "4. Ciphertext (Hex)",
+            "code": ciphertext
+        }
     ]
-    return pt, langkah
+    return ciphertext, langkah
+
+
+# 7. MENGUBAH TEKS HEXADECIMAL KEMBALI JADI BYTES
+def hex_ke_bytes(hex_text):
+    # Menghapus spasi kalau ada
+    hex_text = "".join(hex_text.split())
+
+    # Hex harus punya jumlah karakter genap (2 karakter hex = 1 byte)
+    if len(hex_text) % 2 != 0:
+        raise ValueError("Ciphertext hexadecimal harus memiliki jumlah karakter genap.")
+
+    # Memastikan semua karakternya valid karakter hex (0-9, A-F, a-f)
+    karakter_valid = "0123456789ABCDEFabcdef"
+    for karakter in hex_text:
+        if karakter not in karakter_valid:
+            raise ValueError("Ciphertext hanya boleh berisi angka 0-9 dan huruf A-F.")
+    return bytes.fromhex(hex_text)
+
+# 8. DEKRIPSI
+def dekripsi_block(ciphertext_hex, key):
+    # Validasi input
+    if ciphertext_hex == "":
+        raise ValueError("Ciphertext tidak boleh kosong.")
+
+    # Mengubah ciphertext (hex) jadi bytes
+    data = hex_ke_bytes(ciphertext_hex)
+
+    # Memproses seluruh data, blok demi blok. Karena XOR dua kali dengan
+    # kunci yang sama akan mengembalikan data asli (P = C XOR K), fungsi
+    # yang dipakai SAMA PERSIS dengan proses enkripsi
+    hasil_bytes, rincian_blok, kunci_blok = proses_per_blok(data, key)
+
+    # Membuang padding yang ditambahkan saat enkripsi
+    hasil_tanpa_padding = buang_padding(hasil_bytes, BLOCK_SIZE)
+
+    # Mengubah bytes hasil dekripsi kembali jadi teks biasa
+    try:
+        plaintext = hasil_tanpa_padding.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValueError("Hasil dekripsi bukan teks UTF-8 yang valid. Kunci kemungkinan salah.")
+
+    langkah = [
+        {
+            "title": "1. Kunci per Blok",
+            "desc": (f"Kunci '{key}' diperpanjang jadi {BLOCK_SIZE} byte: {kunci_blok.hex().upper()}. "
+                     f"Kunci yang sama ini dipakai untuk membalikkan (dekripsi) semua blok.")
+        },
+        {
+            "title": "2. XOR per Blok (P = C XOR K)",
+            "desc": "Operasi sama persis seperti enkripsi, karena (P XOR K) XOR K = P.",
+            "table": rincian_blok
+        },
+        {
+            "title": "3. Buang Padding & Plaintext Asli",
+            "code": plaintext
+        }
+    ]
+    return plaintext, langkah

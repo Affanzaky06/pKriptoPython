@@ -1,4 +1,3 @@
-# CAESAR CHIPER
 def caesar_chiper(text, key, decrypt=False):
     # Menghapus semua spasi dari teks input
     text = text.replace(" ", "")

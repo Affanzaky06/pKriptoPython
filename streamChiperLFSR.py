@@ -1,9 +1,9 @@
-# STREAM CIPHER DENGAN LFSR 
+# STREAM CIPHER LFSR 
 # Rumus enkripsi : C = P XOR K
 # Rumus dekripsi : P = C XOR K 
-# Menentukan bit yang digunakan untuk menghitung feedback. 
-# Contoh pada materi: LFSR 4-bit menggunakan b1 XOR b4. 
 
+# Menentukan bit yang digunakan untuk menghitung feedback. 
+# Contoh di materi: LFSR 4-bit menggunakan b1 XOR b4. 
 LFSR_TAPS = {
     4: (1, 4),
     5: (1, 3)
@@ -76,6 +76,7 @@ def buat_keystream(seed, jumlah_bit):
     
 # 4. MEMBUAT TRACE / RIWAYAT PROSES LFSR 
 def buat_trace_lfsr(seed, jumlah_langkah=16): 
+    # Simpan dulu isi register sebelum digeser
     register = [] 
     
     for karakter in seed: 
@@ -93,7 +94,7 @@ def buat_trace_lfsr(seed, jumlah_langkah=16):
         for bit in register: 
             register_sebelum += bit 
             
-        # Menjalankan satu langkah LFSR 
+        # Menjalankan satu langkah LFSR (geser + hitung feedback)
         bit_keluar, bit_feedback = langkah_lfsr( register, taps ) 
         
         # Menyimpan kondisi register setelah digeser 
@@ -132,12 +133,12 @@ def proses_xor(data, seed):
     # Memproses setiap byte 
     for byte_data in data: 
         keystream = "" 
-        # Satu byte terdiri dari 8 bit 
+        # 1 byte = 8 bit, jadi menjalankan LFSR 8 kali buat 1 byte
         for i in range(8): 
             bit_keluar, bit_feedback = langkah_lfsr( register, taps ) 
             keystream += bit_keluar 
         
-        # Mengubah keystream biner menjadi angka 
+        # Mengubah keystream biner menjadi angka biar bisa di-XOR
         nilai_keystream = int(keystream, 2) 
         
         # XOR data dengan keystream 
