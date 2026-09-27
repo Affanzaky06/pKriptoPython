@@ -1,6 +1,11 @@
 def caesar_chiper(text, key, decrypt=False):
     # Menghapus semua spasi dari teks input
     text = text.replace(" ", "")
+
+    # Validasi: teks tidak boleh kosong (konsisten dengan algoritma lain)
+    if text == "":
+        raise ValueError("Teks tidak boleh kosong.")
+    
     hasil = ""
     detailProses = []
 
@@ -55,16 +60,16 @@ def enkripsi_caesar(text, key):
     hasil, detail_proses = caesar_chiper(text, key, False)
     langkah = [
         {
-            "judul": "1. Rumus Enkripsi",
-            "keterangan": f"Setiap huruf digeser maju sebanyak {key} posisi: C = (P + K) mod 26."
+            "title": "1. Rumus Enkripsi",
+            "desc": f"Setiap huruf digeser maju sebanyak {key} posisi: C = (P + K) mod 26."
         },
         {
-            "judul": "2. Proses Setiap Karakter",
-            "tabel": detail_proses
+            "title": "2. Proses Setiap Karakter",
+            "table": detail_proses
         },
         {
-            "judul": "3. Ciphertext",
-            "hasil": hasil
+            "title": "3. Ciphertext",
+            "code": hasil
         }
     ]
     return hasil, langkah
@@ -74,16 +79,16 @@ def dekripsi_caesar(text, key):
     hasil, detail_proses = caesar_chiper(text, key, True)
     langkah = [
         {
-            "judul": "1. Rumus Dekripsi",
-            "keterangan": f"Setiap huruf digeser mundur sebanyak {key} posisi: P = (C - K) mod 26."
+            "title": "1. Rumus Dekripsi",
+            "desc": f"Setiap huruf digeser mundur sebanyak {key} posisi: P = (C - K) mod 26."
         },
         {
-            "judul": "2. Proses Setiap Karakter",
-            "tabel": detail_proses
+            "title": "2. Proses Setiap Karakter",
+            "table": detail_proses
         },
         {
-            "judul": "3. Plaintext",
-            "hasil": hasil
+            "title": "3. Plaintext",
+            "code": hasil
         }
     ]
     return hasil, langkah
