@@ -187,7 +187,9 @@ def informasi_lfsr(seed):
         "Periode Maksimal": periode_maksimal } 
     
     return informasi 
-    
+
+MAKS_LANGKAH_TABEL = 24
+
   # 8. ENKRIPSI STREAM CIPHER 
 def stream_encrypt(text, seed): 
     # Memeriksa seed 
@@ -201,9 +203,12 @@ def stream_encrypt(text, seed):
     
     # Mendapatkan informasi LFSR 
     informasi = informasi_lfsr(seed) 
-    
+
+    total_langkah_asli = len(data) * 8
+    langkah_ditampilkan = min(MAKS_LANGKAH_TABEL, total_langkah_asli)
+
     # Membuat trace LFSR 
-    trace = buat_trace_lfsr(seed, 16) 
+    trace = buat_trace_lfsr(seed, langkah_ditampilkan) 
     
     # Melakukan XOR plaintext dengan keystream 
     hasil, detail_proses = proses_xor(data, seed) 
@@ -212,7 +217,10 @@ def stream_encrypt(text, seed):
     ciphertext = hasil.hex().upper() 
     langkah = [ 
         { "title": "1. Konfigurasi LFSR", "desc": ( f"Register {informasi['Jumlah Register']} bit, " f"seed = {informasi['Seed']}. " f"Fungsi feedback = {informasi['Rumus Feedback']}. " f"Periode maksimum = {informasi['Periode Maksimal']} bit." ) }, 
-        { "title": "2. Trace LFSR", "desc": "Berikut proses 16 langkah pertama pembangkitan keystream.", "table": trace }, 
+        { "title": "2. Trace LFSR",
+            "desc": (f"Langkah proses sebenarnya: {total_langkah_asli} langkah. "
+                     f"Tabel di bawah hanya menampilkan {langkah_ditampilkan} langkah pertama."),
+            "table": trace }, 
         { "title": "3. Enkripsi XOR", "desc": "Setiap byte plaintext di-XOR dengan 8 bit keystream.", "table": detail_proses }, 
         { "title": "4. Ciphertext", "code": ciphertext } 
     ] 
