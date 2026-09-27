@@ -22,7 +22,7 @@ def caesar_chiper(text, key, decrypt=False):
 
     for karakter in text:
         if karakter.isalpha() and karakter.isascii():
-            if karakter.issupper():
+            if karakter.isupper():
                 dasarHuruf = ord("A")
             else:
                 dasarHuruf = ord("a")
