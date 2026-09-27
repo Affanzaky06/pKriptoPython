@@ -3,7 +3,7 @@
 # Rumus dekripsi : P = C XOR K
 
 # ukuran satu blok dalam byte (8 byte = 64 bit)
-BLOCK_SIZE = 8   
+BLOCK_SIZE = 8
 
 # 1. MENYIAPKAN KUNCI SEPANJANG SATU BLOK
 def perpanjang_kunci(key, panjang_blok=BLOCK_SIZE):
@@ -30,7 +30,7 @@ def tambah_padding(data, panjang_blok=BLOCK_SIZE):
     if jumlah_kurang == 0:
         jumlah_kurang = panjang_blok
 
-    # Isi padding: setiap byte tambahan diisi ANGKA jumlah_kurang 
+    # Isi padding: setiap byte tambahan diisi ANGKA jumlah_kurang
     # proses buang_padding: tinggal baca byte terakhir, itulah jumlah byte padding yang harus dibuang.
     return data + bytes([jumlah_kurang] * jumlah_kurang)
 
@@ -74,10 +74,10 @@ def proses_per_blok(data, key):
     kunci_blok = perpanjang_kunci(key, BLOCK_SIZE)
 
     hasil_total = bytearray()
-    rincian_blok = []   
+    rincian_blok = []
 
     # Menyusuri data per BLOCK_SIZE byte sekaligus (blok demi blok)
-    # range(0, len(data), BLOCK_SIZE) menghasilkan: 0, 8, 16, 24, ... 
+    # range(0, len(data), BLOCK_SIZE) menghasilkan: 0, 8, 16, 24, ...
     # artinya "melompat" sejauh satu blok di setiap perulangan
     for nomor_blok, awal in enumerate(range(0, len(data), BLOCK_SIZE), start=1):
         blok = data[awal:awal + BLOCK_SIZE]
@@ -102,7 +102,7 @@ def ratakan_rincian_blok(rincian_blok):
             baris_rata.append({
                 "Blok ke-": blok["Blok ke-"],
                 "Kunci Blok": blok["Kunci blok yang dipakai"],
-                **baris_byte   
+                **baris_byte
                 # membongkar isi baris_byte jadi kolom-kolom baru
             })
     return baris_rata
@@ -112,6 +112,8 @@ def enkripsi_block(text, key):
     # Validasi input
     if text == "":
         raise ValueError("Plaintext tidak boleh kosong.")
+
+    text = text.replace(" ", "")
 
     # Mengubah teks jadi bytes (format UTF-8)
     data = text.encode("utf-8")
